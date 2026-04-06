@@ -428,7 +428,6 @@ def generate_report(state: SearchState) -> SearchState:
         bottomMargin=2*cm
     )
     
-    # Styles
     styles = getSampleStyleSheet()
     
     style_title = ParagraphStyle(
