@@ -16,13 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from mcp_client import MCPClient
 
-# ============================================================================
-# STATE
-# ============================================================================
 
 class EmailState(TypedDict):
     user_question: str
     use_real: bool
+    auto_approve: bool  
     candidat_id: Optional[str]
     email_objet: Optional[str]
     email_contenu: Optional[str]
@@ -32,10 +30,6 @@ class EmailState(TypedDict):
     result: Optional[dict]
     final_message: Optional[str]
 
-# ============================================================================
-# LLM
-# ============================================================================
-
 llm = AzureChatOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
     api_key=settings.AZURE_OPENAI_API_KEY,
@@ -43,10 +37,6 @@ llm = AzureChatOpenAI(
     api_version=settings.AZURE_OPENAI_API_VERSION,
     temperature=0.2,
 )
-
-# ============================================================================
-# NŒUDS
-# ============================================================================
 
 def analyze_intent(state: EmailState) -> EmailState:
     """Analyse l'intention"""
@@ -90,7 +80,7 @@ async def fetch_candidate_async(state: EmailState) -> EmailState:
     mcp_client = MCPClient("http://127.0.0.1:8002")
     try:
         candidate = await mcp_client.get_resource(f"candidat/{state['candidat_id']}")
-        print(f"     {candidate['prenom']} {candidate['nom']}")
+        print(f"    ✓ {candidate['prenom']} {candidate['nom']}")
         print(f"    Email : {candidate['email']}")
         return {**state, "candidate_data": candidate}
     finally:
@@ -175,6 +165,13 @@ INTERDICTIONS :
 
 def human_approval(state: EmailState) -> EmailState:
     """Validation humaine"""
+    
+    # AUTO-APPROVE
+    if state.get('auto_approve', False):
+        print("\n[AUTO-APPROVE] Email approuvé automatiquement")
+        return {**state, "human_approved": True}
+    
+    # SINON : Validation manuelle
     print("\n" + "="*70)
     print("PREVIEW EMAIL")
     print("="*70)
@@ -194,7 +191,6 @@ def human_approval(state: EmailState) -> EmailState:
     if choice == 'e':
         print(" Approuvé")
         return {**state, "human_approved": True}
-    
     elif choice == 'm':
         new_objet = input(f"Nouveau sujet [{state['email_objet']}] : ") or state['email_objet']
         new_contenu = input("Nouveau contenu (Entrée pour garder) : ") or state['email_contenu']
@@ -206,7 +202,6 @@ def human_approval(state: EmailState) -> EmailState:
             "email_contenu": new_contenu,
             "human_approved": True
         }
-    
     else:
         print(" Annulé")
         return {**state, "human_approved": False}
@@ -269,7 +264,7 @@ def build_email_graph():
     
     return g.compile()
 
-def run_email_agent(user_question: str, use_real: bool = True):
+def run_email_agent(user_question: str, use_real: bool = True, auto_approve: bool = False):  
     print("\n" + "="*70)
     print("ACTION 9 - ENVOI EMAIL (VIA MCP - CONFORME CDC)")
     print("="*70)
@@ -280,6 +275,7 @@ def run_email_agent(user_question: str, use_real: bool = True):
     final = graph.invoke({
         "user_question": user_question,
         "use_real": use_real,
+        "auto_approve": auto_approve,  
         "candidat_id": None,
         "email_objet": None,
         "email_contenu": None,
@@ -297,6 +293,4 @@ def run_email_agent(user_question: str, use_real: bool = True):
     return final
 
 if __name__ == "__main__":
-    run_email_agent(user_question="Rejette Chaima",  
-        use_real=True
-        )
+    run_email_agent(user_question="Accept Chayma", use_real=True)

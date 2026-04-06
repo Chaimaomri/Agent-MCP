@@ -17,13 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from mcp_client import MCPClient
 
-# ============================================================================
-# STATE
-# ============================================================================
-
 class SMSState(TypedDict):
     user_question: str
     use_real: bool
+    auto_approve: bool  
     candidat_id: Optional[str]
     sms_message: Optional[str]
     type_communication: Optional[str]  
@@ -32,9 +29,6 @@ class SMSState(TypedDict):
     result: Optional[dict]
     final_message: Optional[str]
 
-# ============================================================================
-# LLM
-# ============================================================================
 
 llm = AzureChatOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
@@ -43,10 +37,6 @@ llm = AzureChatOpenAI(
     api_version=settings.AZURE_OPENAI_API_VERSION,
     temperature=0.2,
 )
-
-# ============================================================================
-# NŒUDS
-# ============================================================================
 
 def analyze_intent(state: SMSState) -> SMSState:
     """Analyse l'intention"""
@@ -90,7 +80,7 @@ async def fetch_candidate_async(state: SMSState) -> SMSState:
     mcp_client = MCPClient("http://127.0.0.1:8002")
     try:
         candidate = await mcp_client.get_resource(f"candidat/{state['candidat_id']}")
-        print(f"     {candidate['prenom']} {candidate['nom']}")
+        print(f"    ✓ {candidate['prenom']} {candidate['nom']}")
         print(f"    Téléphone : {candidate['telephone']}")
         return {**state, "candidate_data": candidate}
     finally:
@@ -132,6 +122,11 @@ def generate_sms(state: SMSState) -> SMSState:
 
 def human_approval(state: SMSState) -> SMSState:
     """Validation humaine"""
+    
+    if state.get('auto_approve', False):
+        print("\n[AUTO-APPROVE] SMS approuvé automatiquement")
+        return {**state, "human_approved": True}
+    
     print("\n" + "="*70)
     print("PREVIEW SMS")
     print("="*70)
@@ -150,17 +145,14 @@ def human_approval(state: SMSState) -> SMSState:
     if choice == 'e':
         print(" Approuvé")
         return {**state, "human_approved": True}
-    
     elif choice == 'm':
         new_sms = input("Nouveau SMS (max 160 car) : ").strip()
         if new_sms:
             if len(new_sms) > 160:
                 new_sms = new_sms[:157] + "..."
             state["sms_message"] = new_sms
-        
         print(" Modifié et approuvé")
         return {**state, "human_approved": True}
-    
     else:
         print(" Annulé")
         return {**state, "human_approved": False}
@@ -179,7 +171,7 @@ async def send_sms_async(state: SMSState) -> SMSState:
             parameters={
                 "candidat_id": state['candidat_id'],
                 "message": state['sms_message'],
-                "type_communication": state['type_communication']  # ✅ OBLIGATOIRE
+                "type_communication": state['type_communication']
             }
         )
         
@@ -228,7 +220,7 @@ def build_sms_graph():
     
     return g.compile()
 
-def run_sms_agent(user_question: str, use_real: bool = True):
+def run_sms_agent(user_question: str, use_real: bool = True, auto_approve: bool = False):  
     print("\n" + "="*70)
     print("ACTION 8 - ENVOI SMS (VIA MCP - CONFORME CDC)")
     print("="*70)
@@ -239,6 +231,7 @@ def run_sms_agent(user_question: str, use_real: bool = True):
     final = graph.invoke({
         "user_question": user_question,
         "use_real": use_real,
+        "auto_approve": auto_approve,  
         "candidat_id": None,
         "sms_message": None,
         "type_communication": None,

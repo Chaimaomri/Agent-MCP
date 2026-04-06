@@ -1,5 +1,5 @@
 """
-Action 6 : Ajout évaluation - CONFORME CDC
+Action 6 : Ajout évaluation - CONFORME CDC AVEC AUTO-APPROVE
 """
 
 from typing import TypedDict, Literal, Optional
@@ -17,13 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from mcp_client import MCPClient
 
-# ============================================================================
-# STATE
-# ============================================================================
-
 class EvaluationState(TypedDict):
     user_question: str
     use_real: bool
+    auto_approve: bool  
     candidature_id: Optional[str]
     scores: Optional[dict] 
     commentaire: Optional[str]
@@ -33,10 +30,6 @@ class EvaluationState(TypedDict):
     result: Optional[dict]
     final_message: Optional[str]
 
-# ============================================================================
-# LLM
-# ============================================================================
-
 llm = AzureChatOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
     api_key=settings.AZURE_OPENAI_API_KEY,
@@ -44,10 +37,6 @@ llm = AzureChatOpenAI(
     api_version=settings.AZURE_OPENAI_API_VERSION,
     temperature=0.2,
 )
-
-# ============================================================================
-# NŒUDS
-# ============================================================================
 
 def analyze_intent(state: EvaluationState) -> EvaluationState:
     """Analyse l'intention"""
@@ -109,6 +98,12 @@ def fetch_candidature(state: EvaluationState) -> EvaluationState:
 
 def human_approval(state: EvaluationState) -> EvaluationState:
     """Validation humaine"""
+    
+    
+    if state.get('auto_approve', False):
+        print("\n[AUTO-APPROVE] Évaluation approuvée automatiquement")
+        return {**state, "human_approved": True}
+    
     print("\n" + "="*70)
     print("PREVIEW ÉVALUATION")
     print("="*70)
@@ -137,7 +132,6 @@ def human_approval(state: EvaluationState) -> EvaluationState:
     if choice == 'e':
         print(" Approuvé")
         return {**state, "human_approved": True}
-    
     elif choice == 'm':
         new_comment = input("Nouveau commentaire (Entrée pour garder) : ").strip()
         if new_comment:
@@ -149,7 +143,6 @@ def human_approval(state: EvaluationState) -> EvaluationState:
         
         print(" Modifié et approuvé")
         return {**state, "human_approved": True}
-    
     else:
         print(" Annulé")
         return {**state, "human_approved": False}
@@ -173,7 +166,7 @@ async def execute_action_async(state: EvaluationState) -> EvaluationState:
             }
         )
         
-        print(f"\n Évaluation enregistrée : {result.get('evaluation_id')}")
+        print(f"\n✓ Évaluation enregistrée : {result.get('evaluation_id')}")
         
         return {**state, "result": result, "final_message": "Évaluation enregistrée"}
     
@@ -205,7 +198,7 @@ def build_evaluation_graph():
     
     return g.compile()
 
-def run_evaluation_agent(user_question: str, use_real: bool = True):
+def run_evaluation_agent(user_question: str, use_real: bool = True, auto_approve: bool = False):  
     print("\n" + "="*70)
     print("ACTION 6 - AJOUT ÉVALUATION (VIA MCP - CONFORME CDC)")
     print("="*70)
@@ -216,6 +209,7 @@ def run_evaluation_agent(user_question: str, use_real: bool = True):
     final = graph.invoke({
         "user_question": user_question,
         "use_real": use_real,
+        "auto_approve": auto_approve,  
         "candidature_id": None,
         "scores": None,
         "commentaire": None,

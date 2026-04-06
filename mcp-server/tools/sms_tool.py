@@ -40,7 +40,7 @@ async def envoyer_sms_tool(
         }
     
     # VÉRIFICATION CONSENTEMENT RGPD
-    candidature = CANDIDATURE_123_456  # Contient consentement_sms
+    candidature = CANDIDATURE_123_456  
     
     if not candidature.get('consentement_sms'):
         return {

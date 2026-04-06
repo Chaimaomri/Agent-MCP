@@ -6,11 +6,10 @@ if __name__ == "__main__":
     print("="*70)
     
     # ========== CONFIGURATION ==========
-    # ⚠️ IMPORTANT: Remplace par TON email pour recevoir le test !
-    test_email = "ton.email@gmail.com"  # ← CHANGE ICI
+    test_email = "ton.email@gmail.com" 
     
     # Contenu du test
-    test_subject = "🚀 Test Agent IA - Resend"
+    test_subject = " Test Agent IA - Resend"
     test_content = """
     <h2>Bonjour ! 👋</h2>
     
@@ -18,9 +17,9 @@ if __name__ == "__main__":
     
     <p>Fonctionnalités testées :</p>
     <ul>
-        <li>✅ Envoi via Resend</li>
-        <li>✅ Template HTML professionnel</li>
-        <li>✅ Configuration API Key</li>
+        <li> Envoi via Resend</li>
+        <li> Template HTML professionnel</li>
+        <li> Configuration API Key</li>
     </ul>
     
     <p>Si tu reçois cet email, tout fonctionne parfaitement ! 🎉</p>
@@ -29,7 +28,6 @@ if __name__ == "__main__":
     L'équipe NextGen Technologies</p>
     """
     
-    # ========== CHOIX DU MODE ==========
     print("\nMode d'envoi :")
     print("1. MOCK (simulation uniquement)")
     print("2. RÉEL (envoi via Resend)")
@@ -38,20 +36,18 @@ if __name__ == "__main__":
     
     use_real = (choice == "2")
     
-    # Confirmation si mode réel
     if use_real:
-        print(f"\n⚠️  MODE RÉEL activé !")
+        print(f"\n  MODE RÉEL activé !")
         print(f"   Un vrai email sera envoyé à : {test_email}")
         print(f"   Via : Resend (onboarding@resend.dev)")
         
         confirm = input("\nConfirmer l'envoi ? [o/N] : ").lower().strip()
         
         if confirm != 'o':
-            print("\n❌ Test annulé.")
+            print("\n Test annulé.")
             exit()
     
-    # ========== ENVOI ==========
-    print("\n🚀 Envoi en cours...")
+    print("\n Envoi en cours...")
     
     result = send_email(
         to=test_email,
@@ -60,19 +56,18 @@ if __name__ == "__main__":
         use_real=use_real
     )
     
-    # ========== RÉSULTAT ==========
     print("\n" + "="*70)
     print("RÉSULTAT")
     print("="*70)
     
     if result["status"] in ["sent", "mock_sent"]:
-        print("✅ Succès !")
+        print(" Succès !")
         if use_real:
             print(f"\n📧 Vérifie ta boîte email : {test_email}")
             print(f"   (L'email arrive en 2-3 secondes)")
             print(f"\n   Email ID : {result.get('email_id', 'N/A')}")
     else:
-        print("❌ Erreur !")
+        print(" Erreur !")
         print(f"   Détails : {result.get('error', 'Erreur inconnue')}")
     
     print("="*70)

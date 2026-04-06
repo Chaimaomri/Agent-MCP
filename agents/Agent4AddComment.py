@@ -17,13 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from mcp_client import MCPClient
 
-# ============================================================================
-# STATE
-# ============================================================================
-
 class CommentState(TypedDict):
     user_question: str
     use_real: bool
+    auto_approve: bool  
     candidat_id: Optional[str]
     comment_content: Optional[str]
     comment_category: Optional[str] 
@@ -32,10 +29,6 @@ class CommentState(TypedDict):
     result: Optional[dict]
     final_message: Optional[str]
 
-# ============================================================================
-# LLM
-# ============================================================================
-
 llm = AzureChatOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
     api_key=settings.AZURE_OPENAI_API_KEY,
@@ -43,10 +36,6 @@ llm = AzureChatOpenAI(
     api_version=settings.AZURE_OPENAI_API_VERSION,
     temperature=0.2,
 )
-
-# ============================================================================
-# NŒUDS
-# ============================================================================
 
 def analyze_intent(state: CommentState) -> CommentState:
     """Analyse l'intention"""
@@ -75,11 +64,11 @@ def analyze_intent(state: CommentState) -> CommentState:
             **state,
             "candidat_id": data.get("candidat_id", "123"),
             "comment_content": data.get("comment_content"),
-            "comment_category": data.get("comment_category"),  # Peut être None
+            "comment_category": data.get("comment_category"),
         }
     
     except Exception as e:
-        print(f"     Erreur : {e}")
+        print(f"    Erreur : {e}")
         return {
             **state,
             "candidat_id": "123",
@@ -94,7 +83,7 @@ async def fetch_candidate_async(state: CommentState) -> CommentState:
     mcp_client = MCPClient("http://127.0.0.1:8002")
     try:
         candidate = await mcp_client.get_resource(f"candidat/{state['candidat_id']}")
-        print(f"     {candidate['prenom']} {candidate['nom']}")
+        print(f"    ✓ {candidate['prenom']} {candidate['nom']}")
         return {**state, "candidate_data": candidate}
     finally:
         await mcp_client.close()
@@ -104,6 +93,13 @@ def fetch_candidate(state: CommentState) -> CommentState:
 
 def human_approval(state: CommentState) -> CommentState:
     """Validation humaine"""
+    
+    # AUTO-APPROVE
+    if state.get('auto_approve', False):
+        print("\n[AUTO-APPROVE] Commentaire approuvé automatiquement")
+        return {**state, "human_approved": True}
+    
+    # SINON : Validation manuelle
     print("\n" + "="*70)
     print("PREVIEW COMMENTAIRE")
     print("="*70)
@@ -119,18 +115,16 @@ def human_approval(state: CommentState) -> CommentState:
     choice = input("\n[e] Ajouter  [m] Modifier  [a] Annuler\nChoix : ").lower()
     
     if choice == 'e':
-        print("Approuvé")
+        print(" Approuvé")
         return {**state, "human_approved": True}
-    
     elif choice == 'm':
         new_content = input("Nouveau contenu (Entrée pour garder) : ").strip()
         if new_content:
             state["comment_content"] = new_content
-        print("Modifié et approuvé")
+        print(" Modifié et approuvé")
         return {**state, "human_approved": True}
-    
     else:
-        print("Annulé")
+        print(" Annulé")
         return {**state, "human_approved": False}
 
 async def execute_action_async(state: CommentState) -> CommentState:
@@ -147,7 +141,7 @@ async def execute_action_async(state: CommentState) -> CommentState:
             parameters={
                 "candidat_id": state['candidat_id'],
                 "contenu": state['comment_content'],
-                "categorie": state['comment_category']  # Peut être None
+                "categorie": state['comment_category']
             }
         )
         
@@ -183,7 +177,7 @@ def build_comment_graph():
     
     return g.compile()
 
-def run_comment_agent(user_question: str, use_real: bool = True):
+def run_comment_agent(user_question: str, use_real: bool = True, auto_approve: bool = False):  
     print("\n" + "="*70)
     print("ACTION 4 - AJOUT COMMENTAIRE (VIA MCP - CONFORME CDC)")
     print("="*70)
@@ -194,6 +188,7 @@ def run_comment_agent(user_question: str, use_real: bool = True):
     final = graph.invoke({
         "user_question": user_question,
         "use_real": use_real,
+        "auto_approve": auto_approve,  
         "candidat_id": None,
         "comment_content": None,
         "comment_category": None,

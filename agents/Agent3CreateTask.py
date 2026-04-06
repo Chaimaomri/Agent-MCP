@@ -17,13 +17,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import settings
 from mcp_client import MCPClient
 
-# ============================================================================
-# STATE
-# ============================================================================
+
 
 class TaskState(TypedDict):
     user_question: str
     use_real: bool
+    auto_approve: bool  
     candidature_id: Optional[str]  
     task_type: Optional[str]  
     task_description: Optional[str]
@@ -35,9 +34,7 @@ class TaskState(TypedDict):
     result: Optional[dict]
     final_message: Optional[str]
 
-# ============================================================================
-# LLM
-# ============================================================================
+
 
 llm = AzureChatOpenAI(
     azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
@@ -47,9 +44,7 @@ llm = AzureChatOpenAI(
     temperature=0.2,
 )
 
-# ============================================================================
-# NŒUDS
-# ============================================================================
+
 
 def analyze_intent(state: TaskState) -> TaskState:
     """Analyse l'intention et extrait les paramètres"""
@@ -89,7 +84,7 @@ def analyze_intent(state: TaskState) -> TaskState:
         }
     
     except Exception as e:
-        print(f"    ⚠️ Erreur : {e}")
+        print(f"     Erreur : {e}")
         return {
             **state,
             "candidature_id": "cand_789",
@@ -108,7 +103,7 @@ async def fetch_candidature_async(state: TaskState) -> TaskState:
         candidature_id = state.get("candidature_id", "cand_789")
         candidature = await mcp_client.get_resource(f"candidature/{candidature_id}")
         
-        print(f"     Candidature : {candidature['candidat_nom']}")
+        print(f"    ✓ Candidature : {candidature['candidat_nom']}")
         print(f"    Offre : {candidature['offre_titre']}")
         
         return {**state, "candidature_data": candidature}
@@ -120,6 +115,13 @@ def fetch_candidature(state: TaskState) -> TaskState:
 
 def human_approval(state: TaskState) -> TaskState:
     """Validation humaine"""
+    
+    #  AUTO-APPROVE
+    if state.get('auto_approve', False):
+        print("\n[AUTO-APPROVE] Tâche approuvée automatiquement")
+        return {**state, "human_approved": True}
+    
+    # SINON : Validation manuelle
     print("\n" + "="*70)
     print("PREVIEW TÂCHE")
     print("="*70)
@@ -147,14 +149,12 @@ def human_approval(state: TaskState) -> TaskState:
     if choice == 'e':
         print(" Approuvé")
         return {**state, "human_approved": True}
-    
     elif choice == 'm':
         new_desc = input("Nouvelle description (Entrée pour garder) : ").strip()
         if new_desc:
             state["task_description"] = new_desc
         print(" Modifié et approuvé")
         return {**state, "human_approved": True}
-    
     else:
         print(" Annulé")
         return {**state, "human_approved": False}
@@ -180,7 +180,7 @@ async def execute_action_async(state: TaskState) -> TaskState:
             }
         )
         
-        print(f"\n Tâche créée : {result.get('task_id')}")
+        print(f"\n✓ Tâche créée : {result.get('task_id')}")
         
         return {**state, "result": result, "final_message": "Tâche créée"}
     
@@ -212,7 +212,7 @@ def build_task_graph():
     
     return g.compile()
 
-def run_task_agent(user_question: str, use_real: bool = True):
+def run_task_agent(user_question: str, use_real: bool = True, auto_approve: bool = False):  
     print("\n" + "="*70)
     print("ACTION 3 - CRÉATION TÂCHE (VIA MCP - CONFORME CDC)")
     print("="*70)
@@ -223,6 +223,7 @@ def run_task_agent(user_question: str, use_real: bool = True):
     final = graph.invoke({
         "user_question": user_question,
         "use_real": use_real,
+        "auto_approve": auto_approve,  
         "candidature_id": None,
         "task_type": None,
         "task_description": None,

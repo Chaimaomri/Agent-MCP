@@ -9,10 +9,6 @@ import uvicorn
 
 app = FastAPI(title="MCP Server - Agent Recrutement NextGen")
 
-# ============================================================================
-# MODELS MCP
-# ============================================================================
-
 class ToolCall(BaseModel):
     tool_name: str
     parameters: Dict[str, Any]
@@ -31,7 +27,7 @@ class ResourceResponse(BaseModel):
     error: Optional[str] = None
 
 # ============================================================================
-# IMPORT TOOLS (avec gestion d'erreur)
+# IMPORT TOOLS
 # ============================================================================
 
 try:
@@ -69,8 +65,36 @@ except Exception as e:
     print(f" Erreur evaluation_tool: {e}")
     ajouter_evaluation_tool = None
 
+try:
+    from tools.interview_tool import envoyer_mail_entretien
+    print(" interview_tool importé")
+except Exception as e:
+    print(f" Erreur interview_tool: {e}")
+    envoyer_mail_entretien = None
+
+try:
+    from tools.move_tool import deplacer_candidature_tool
+    print(" move_tool importé")
+except Exception as e:
+    print(f" Erreur move_tool: {e}")
+    deplacer_candidature_tool = None
+
+try:
+    from tools.analyze_tool import analyser_coherence_tool
+    print(" analyze_tool importé")
+except Exception as e:
+    print(f" Erreur analyze_tool: {e}")
+    analyser_coherence_tool = None
+
+try:
+    from tools.pdf_tool import creer_kit_entretien_tool
+    print(" pdf_tool importé")
+except Exception as e:
+    print(f" Erreur pdf_tool: {e}")
+    creer_kit_entretien_tool = None
+
 # ============================================================================
-# IMPORT RESOURCES (avec gestion d'erreur)
+# IMPORT RESOURCES
 # ============================================================================
 
 try:
@@ -94,9 +118,22 @@ except Exception as e:
     print(f" Erreur offre: {e}")
     get_offre_resource = None
 
+try:
+    from resources.etape import get_etape_resource
+    print(" etape resource importée")
+except Exception as e:
+    print(f" Erreur etape: {e}")
+    get_etape_resource = None
+
+try:
+    from tools.search_tool import rechercher_profil_web_tool
+    print("✓ search_tool importé")
+except Exception as e:
+    print(f"✗ Erreur search_tool: {e}")
+    rechercher_profil_web_tool = None
 
 # ============================================================================
-# REGISTRY
+# TOOLS REGISTRY
 # ============================================================================
 
 TOOLS_REGISTRY = {}
@@ -129,6 +166,36 @@ if ajouter_evaluation_tool:
     TOOLS_REGISTRY["ajouter_evaluation"] = {
         "function": ajouter_evaluation_tool,
         "description": "Ajoute une évaluation"
+    }
+
+if envoyer_mail_entretien:
+    TOOLS_REGISTRY["envoyer_mail_entretien"] = {
+        "function": envoyer_mail_entretien,
+        "description": "Envoie un email de convocation d'entretien"
+    }
+
+if deplacer_candidature_tool:
+    TOOLS_REGISTRY["deplacer_candidature"] = {
+        "function": deplacer_candidature_tool,
+        "description": "Déplace une candidature vers une nouvelle étape"
+    }
+
+if analyser_coherence_tool:
+    TOOLS_REGISTRY["analyser_coherence"] = {
+        "function": analyser_coherence_tool,
+        "description": "Analyse la cohérence d'un profil candidat"
+    }
+
+if creer_kit_entretien_tool:
+    TOOLS_REGISTRY["creer_kit_entretien"] = {
+        "function": creer_kit_entretien_tool,
+        "description": "Génère un kit d'entretien PDF complet"
+    }
+
+if rechercher_profil_web_tool:
+    TOOLS_REGISTRY["rechercher_profil_web"] = {
+        "function": rechercher_profil_web_tool,
+        "description": "Recherche profil web candidat et croise avec CV "
     }
 
 # ============================================================================
@@ -203,6 +270,12 @@ async def get_resource(request: ResourceRequest) -> ResourceResponse:
             offre_id = parts[1]
             data = await get_offre_resource(offre_id)
         
+        elif parts[0] == "etape" and len(parts) == 2:
+            if not get_etape_resource:
+                raise Exception("Resource etape non disponible")
+            etape_id = parts[1]
+            data = await get_etape_resource(etape_id)
+        
         else:
             return ResourceResponse(success=False, error=f"URI non reconnue: {uri}")
         
@@ -212,9 +285,6 @@ async def get_resource(request: ResourceRequest) -> ResourceResponse:
         print(f"[MCP] Erreur: {e}")
         return ResourceResponse(success=False, error=str(e))
 
-# ============================================================================
-# LANCEMENT
-# ============================================================================
 
 if __name__ == "__main__":
     print("\n" + "="*70)
@@ -222,7 +292,7 @@ if __name__ == "__main__":
     print("="*70)
     print(f"Tools disponibles: {len(TOOLS_REGISTRY)}")
     for tool_name in TOOLS_REGISTRY.keys():
-        print(f"  - {tool_name}")
+        print(f"   {tool_name}")
     print("="*70 + "\n")
     
     uvicorn.run(
